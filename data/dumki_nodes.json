@@ -1,0 +1,117 @@
+{
+  "depots": [
+    {
+      "id": "DEPOT-PSTU",
+      "name": "PSTU Central Drone Command & Charging Hub",
+      "subtitle": "Patuakhali Science and Technology University Main Campus",
+      "lat": 22.4648,
+      "lon": 90.3835,
+      "type": "central_hub",
+      "charging_bays": 2,
+      "icon": "plane",
+      "color": "red"
+    }
+  ],
+  "delivery_nodes": [
+    {
+      "id": "LOC-PSTU-CSE",
+      "name": "PSTU Faculty of CSE & Engineering Complex",
+      "lat": 22.4665,
+      "lon": 90.3846,
+      "zone": "PSTU Campus",
+      "type": "academic_faculty",
+      "icon": "desktop",
+      "color": "blue"
+    },
+    {
+      "id": "LOC-PSTU-MED",
+      "name": "PSTU Campus Medical Center & Emergency Post",
+      "lat": 22.4636,
+      "lon": 90.3820,
+      "zone": "PSTU Campus",
+      "type": "campus_clinic",
+      "icon": "medkit",
+      "color": "green"
+    },
+    {
+      "id": "LOC-PSTU-HALLS",
+      "name": "PSTU Residential Halls (Keramat Ali & FMB)",
+      "lat": 22.4622,
+      "lon": 90.3855,
+      "zone": "PSTU Campus",
+      "type": "residential_hall",
+      "icon": "home",
+      "color": "purple"
+    },
+    {
+      "id": "LOC-PSTU-AGRI",
+      "name": "PSTU Agro-Research Farm & Botanical Garden",
+      "lat": 22.4682,
+      "lon": 90.3868,
+      "zone": "PSTU Campus",
+      "type": "research_farm",
+      "icon": "leaf",
+      "color": "darkgreen"
+    },
+    {
+      "id": "LOC-DUMKI-HOSP",
+      "name": "Dumki Upazila Health Complex (Govt Hospital)",
+      "lat": 22.4530,
+      "lon": 90.3850,
+      "zone": "Dumki Regional",
+      "type": "regional_hospital",
+      "icon": "plus-sign",
+      "color": "darkred"
+    },
+    {
+      "id": "LOC-DUMKI-BAZAR",
+      "name": "Dumki Central Bazar Logistics Point",
+      "lat": 22.4505,
+      "lon": 90.3780,
+      "zone": "Dumki Regional",
+      "type": "commercial_hub",
+      "icon": "shopping-cart",
+      "color": "orange"
+    },
+    {
+      "id": "LOC-LEBUKHALI",
+      "name": "Lebukhali Payra Bridge Highway Hub",
+      "lat": 22.4780,
+      "lon": 90.3450,
+      "zone": "Dumki Regional",
+      "type": "transit_gateway",
+      "icon": "road",
+      "color": "darkblue"
+    },
+    {
+      "id": "LOC-MURADIA",
+      "name": "Muradia Union Parishad Community Center",
+      "lat": 22.4850,
+      "lon": 90.4120,
+      "zone": "Dumki Regional",
+      "type": "rural_council",
+      "icon": "briefcase",
+      "color": "cadetblue"
+    },
+    {
+      "id": "LOC-PANGASHIA",
+      "name": "Pangashia Rural Primary Health Post",
+      "lat": 22.4350,
+      "lon": 90.3520,
+      "zone": "Dumki Regional",
+      "type": "rural_clinic",
+      "icon": "heart",
+      "color": "pink"
+    },
+    {
+      "id": "LOC-ANGARIA",
+      "name": "Angaria Union Council Post",
+      "lat": 22.4180,
+      "lon": 90.3950,
+      "zone": "Dumki Regional",
+      "type": "rural_council",
+      "icon": "flag",
+      "color": "gray"
+    }
+  ]
+}
