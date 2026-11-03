@@ -74,7 +74,11 @@ with st.sidebar:
     st.markdown("### 🌤️ Climate & Weather Scenario")
     weather_key = st.selectbox("Weather Condition", list(WEATHER_SCENARIOS.keys()), index=0)
     weather = WEATHER_SCENARIOS[weather_key]
-    st.info(f"**{weather.name}**\n\n{weather.description}\n\n*Flight Power Penalty:* **{weather.climate_multiplier:.2f}x**")
+    st.info(
+        f"**{weather.name}** ({weather.ambient_temp_c:.0f} °C, {weather.headwind_mps:.0f} m/s wind)\n\n"
+        f"{weather.description}\n\n"
+        f"*Flight Power Multiplier:* **{weather.climate_multiplier:.3f}x**"
+    )
     
     st.divider()
     random_seed = st.number_input("Random Seed (Reproducibility)", min_value=1, max_value=9999, value=42, step=1)
@@ -169,18 +173,18 @@ with tab_map:
             "Zone": n.get("zone", "Dumki Regional"),
             "Type": n["type"].replace("_", " ").title(),
             "Distance from PSTU (km)": f"{dist:.2f} km",
-            "Est. Flight Time": f"{flight_sec/60.0:.1f} mins",
-            "Base Energy (Loaded 1.5kg)": f"{(210.0 + 45.0*1.5) * (flight_sec/3600.0):.1f} Wh"
+            "Est. Flight Leg Time (min)": f"{flight_sec/60.0:.2f} min",
+            "Base Leg Energy (1.5 kg, 1.0x)": f"{(210.0 + 45.0*1.5) * (flight_sec/3600.0):.2f} Wh"
         })
-    st.dataframe(pd.DataFrame(node_rows), use_container_width=True)
+    st.dataframe(pd.DataFrame(node_rows), width="stretch")
 
 with tab_benchmark:
-    st.markdown("### ⚔️ Comparative Performance: Baseline FCFS vs. Proposed Battery-Aware Dispatcher")
-    st.caption("Evaluates mission safety under identical stochastic order arrival streams and physical battery constraints.")
+    st.markdown("### ⚔️ Comparative Performance: Baseline FCFS vs. Proposed Battery-Aware Dispatcher (BAPA)")
+    st.caption("Evaluates customer package delivery success and full round-trip mission safety under identical stochastic order streams.")
 
     col_btn, col_blank = st.columns([1, 3])
     with col_btn:
-        run_experiment = st.button("▶ Run Head-to-Head Simulation", use_container_width=True, type="primary")
+        run_experiment = st.button("▶ Run Head-to-Head Simulation", width="stretch", type="primary")
 
     if run_experiment:
         # Run Baseline (FCFS)
@@ -209,35 +213,79 @@ with tab_benchmark:
         sim_bapa.run(max_duration_min=480.0)
         metrics_bapa = sim_bapa.get_summary_metrics()
 
-        # Metrics cards
-        m1, m2, m3, m4 = st.columns(4)
+        # Metrics cards distinguishing Delivery Success vs. Round-Trip Mission Success
+        m1, m2, m3, m4, m5 = st.columns(5)
         with m1:
-            delta_sr = metrics_bapa["success_rate_pct"] - metrics_fcfs["success_rate_pct"]
-            st.metric("Success Rate (Battery-Aware)", f"{metrics_bapa['success_rate_pct']}%", f"{delta_sr:+.1f}% vs FCFS Baseline")
+            delta_deliv = metrics_bapa["success_rate_pct"] - metrics_fcfs["success_rate_pct"]
+            st.metric(
+                "Delivery Success (BAPA)",
+                f"{metrics_bapa['success_rate_pct']:.1f}%",
+                f"{delta_deliv:+.1f}% vs FCFS ({metrics_fcfs['success_rate_pct']:.1f}%)"
+            )
         with m2:
-            st.metric("Successful Deliveries", f"{metrics_bapa['delivered_orders']} / {num_requests}", f"{metrics_fcfs['failed_orders']} FCFS Crashes/Failures")
+            delta_mission = metrics_bapa["mission_success_rate_pct"] - metrics_fcfs["mission_success_rate_pct"]
+            st.metric(
+                "Mission Success (BAPA)",
+                f"{metrics_bapa['mission_success_rate_pct']:.1f}%",
+                f"{delta_mission:+.1f}% vs FCFS ({metrics_fcfs['mission_success_rate_pct']:.1f}%)"
+            )
         with m3:
-            st.metric("Avg Order Turnaround", f"{metrics_bapa['avg_delivery_time_min']} min", f"{metrics_bapa['avg_delivery_time_min'] - metrics_fcfs['avg_delivery_time_min']:+.1f} min")
+            st.metric(
+                "Return-Leg Failures",
+                f"{metrics_bapa['return_leg_failures']} BAPA / {metrics_fcfs['return_leg_failures']} FCFS",
+                f"{metrics_fcfs['failed_drones']} FCFS Drone(s) Lost",
+                delta_color="off"
+            )
         with m4:
-            st.metric("Total Fleet Energy", f"{metrics_bapa['total_energy_consumed_wh']:.1f} Wh", f"{weather.climate_multiplier:.2f}x Weather Penalty")
+            delta_time = metrics_bapa["avg_delivery_time_min"] - metrics_fcfs["avg_delivery_time_min"]
+            st.metric(
+                "Avg Delivery Time (BAPA)",
+                f"{metrics_bapa['avg_delivery_time_min']:.2f} min",
+                f"{delta_time:+.2f} min vs FCFS",
+                delta_color="inverse"
+            )
+        with m5:
+            st.metric(
+                "Total Fleet Energy (BAPA)",
+                f"{metrics_bapa['total_energy_consumed_wh']:.1f} Wh",
+                f"{weather.climate_multiplier:.3f}x Climate Multiplier",
+                delta_color="off"
+            )
 
         # Visual Comparison Charts
         st.markdown("#### 📊 Quantitative Benchmark Results")
         comp_df = pd.DataFrame([metrics_fcfs, metrics_bapa])
-        
+
+        rates_long_df = pd.DataFrame([
+            {"Algorithm": metrics_fcfs["algorithm"], "Metric": "Delivery Success (%)", "Rate (%)": metrics_fcfs["success_rate_pct"]},
+            {"Algorithm": metrics_fcfs["algorithm"], "Metric": "Round-Trip Mission Success (%)", "Rate (%)": metrics_fcfs["mission_success_rate_pct"]},
+            {"Algorithm": metrics_bapa["algorithm"], "Metric": "Delivery Success (%)", "Rate (%)": metrics_bapa["success_rate_pct"]},
+            {"Algorithm": metrics_bapa["algorithm"], "Metric": "Round-Trip Mission Success (%)", "Rate (%)": metrics_bapa["mission_success_rate_pct"]},
+        ])
+
         c1, c2 = st.columns(2)
         with c1:
             fig_sr = px.bar(
-                comp_df,
-                x="algorithm",
-                y="success_rate_pct",
-                color="algorithm",
-                title="Delivery Mission Success Rate (%)",
-                text="success_rate_pct",
-                color_discrete_map={"Baseline (FCFS + Greedy)": "#e53e3e", "Proposed (Battery-Aware)": "#38b2ac"}
+                rates_long_df,
+                x="Algorithm",
+                y="Rate (%)",
+                color="Metric",
+                barmode="group",
+                title="Customer Delivery vs. Round-Trip Mission Success (%)",
+                text="Rate (%)",
+                color_discrete_map={
+                    "Delivery Success (%)": "#38bdf8",
+                    "Round-Trip Mission Success (%)": "#38b2ac"
+                }
             )
-            fig_sr.update_layout(paper_bgcolor="#0c1724", plot_bgcolor="#0c1724", font=dict(color="#e2e8f0"), showlegend=False)
-            st.plotly_chart(fig_sr, use_container_width=True)
+            fig_sr.update_layout(
+                paper_bgcolor="#0c1724",
+                plot_bgcolor="#0c1724",
+                font=dict(color="#e2e8f0"),
+                yaxis=dict(range=[0, 108]),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_sr, width="stretch")
 
         with c2:
             fig_wait = px.bar(
@@ -247,22 +295,47 @@ with tab_benchmark:
                 color="algorithm",
                 title="Total Charging Bay Queue Delay (min)",
                 text="total_charging_wait_min",
+                labels={"algorithm": "Algorithm", "total_charging_wait_min": "Queue Wait (min)"},
                 color_discrete_map={"Baseline (FCFS + Greedy)": "#e53e3e", "Proposed (Battery-Aware)": "#38b2ac"}
             )
             fig_wait.update_layout(paper_bgcolor="#0c1724", plot_bgcolor="#0c1724", font=dict(color="#e2e8f0"), showlegend=False)
-            st.plotly_chart(fig_wait, use_container_width=True)
+            st.plotly_chart(fig_wait, width="stretch")
+
+        # Side-by-side Summary Table including Return-Leg Failures and Drone Utilization
+        summary_rows = []
+        for m in (metrics_fcfs, metrics_bapa):
+            summary_rows.append({
+                "Dispatch Policy": m["algorithm"],
+                "Total Orders": m["total_orders"],
+                "Packages Delivered": m["delivered_orders"],
+                "Completed Round-Trips": m["completed_missions"],
+                "Outbound Failures": m["failed_orders"],
+                "Return-Leg Failures": m["return_leg_failures"],
+                "Lost Drones": m["failed_drones"],
+                "Delivery Success (%)": f"{m['success_rate_pct']:.1f}%",
+                "Mission Success (%)": f"{m['mission_success_rate_pct']:.1f}%",
+                "Avg Delivery Time (min)": f"{m['avg_delivery_time_min']:.2f}",
+                "Total Energy (Wh)": f"{m['total_energy_consumed_wh']:.2f}",
+                "Total Distance (km)": f"{m['total_distance_km']:.2f}",
+                "Charging Queue Wait (min)": f"{m['total_charging_wait_min']:.2f}",
+                "Drone Flight Utilization (%)": f"{m['drone_utilization_pct']:.2f}%",
+            })
+        st.dataframe(pd.DataFrame(summary_rows), width="stretch")
 
         # Fleet Telemetry
         st.markdown("#### 🚁 Individual Drone Fleet Telemetry (Battery-Aware Dispatch)")
         fleet_data = [{
             "Drone ID": d.drone_id,
-            "Completed Missions": d.total_deliveries,
+            "Final Status": d.status.value,
+            "Packages Delivered": d.total_deliveries,
+            "Completed Round-Trips": d.completed_missions,
+            "Failed Missions": d.failed_missions,
             "Distance Flown (km)": round(d.total_distance_km, 2),
             "Energy Used (Wh)": round(d.total_energy_consumed_wh, 2),
-            "Final Battery Level (SoC)": f"{d.battery.current_soc*100:.1f}%",
-            "Charging Queue Wait (min)": round(d.total_charging_wait_min, 1)
+            "Final Battery SoC (%)": f"{d.battery.current_soc*100:.1f}%",
+            "Charging Queue Wait (min)": round(d.total_charging_wait_min, 2)
         } for d in fleet_bapa]
-        st.dataframe(pd.DataFrame(fleet_data), use_container_width=True)
+        st.dataframe(pd.DataFrame(fleet_data), width="stretch")
 
         # Store latest logs in session state
         st.session_state["latest_events"] = sim_bapa.get_event_log_df()
@@ -273,7 +346,7 @@ with tab_logs:
     st.markdown("### 📋 Chronological Discrete-Event Execution Logs")
     if "latest_events" in st.session_state:
         df_logs = st.session_state["latest_events"]
-        st.dataframe(df_logs, use_container_width=True)
+        st.dataframe(df_logs, width="stretch")
         csv = df_logs.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Event Logs (CSV)", csv, "dumki_pstu_drone_events.csv", "text/csv")
     else:

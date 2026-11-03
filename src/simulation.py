@@ -1,6 +1,23 @@
 """
 Core Discrete-Event Simulation (DES) Engine using SimPy.
 Simulates fleet flight dynamics, battery drain, payload drop-offs, and charging bay queues.
+
+Lifecycle & Metric Definitions:
+1. Delivery Success:
+   Customer package is physically transported from the depot and delivered at `destination_node`
+   (`request.status == "DELIVERED"`, recorded in `completed_orders`).
+2. Mission Success:
+   Full round-trip completion where the drone delivers the package at `destination_node` AND
+   returns safely to the depot with remaining battery (`request.mission_status == "COMPLETED"`,
+   recorded in `completed_missions`).
+3. Drone Failure:
+   Mid-air battery exhaustion (`SoC == 0.0`) on either the outbound leg (`OUTBOUND_FAILED`)
+   or the return leg (`RETURN_FAILED`), transitioning the drone to `DroneStatus.FAILED_OUT_OF_BATTERY`
+   and recording the mission in `failed_missions` (and `return_failures` if on the inbound leg).
+4. Failed Delivery:
+   A delivery request that fails to reach the customer at `destination_node` due to outbound
+   mid-flight failure (`request.status == "FAILED"`, recorded in `failed_orders`). Mutually
+   exclusive with `completed_orders` so no delivery request is ever counted twice.
 """
 from __future__ import annotations
 from typing import List, Dict, Any
@@ -35,10 +52,15 @@ class DroneDeliverySimulation:
         self.charging_station = simpy.Resource(self.env, capacity=self.num_charging_bays)
         self.events_log: List[Dict[str, Any]] = []
 
-        # Order queues
+        # Customer delivery order queues (mutually exclusive terminal states)
         self.pending_orders: List[DeliveryRequest] = []
         self.completed_orders: List[DeliveryRequest] = []
         self.failed_orders: List[DeliveryRequest] = []
+
+        # Full round-trip mission & return-leg tracking
+        self.completed_missions: List[DeliveryRequest] = []
+        self.failed_missions: List[DeliveryRequest] = []
+        self.return_failures: List[DeliveryRequest] = []
 
     def log_event(self, event_type: str, drone_id: str, details: str, soc: float = 1.0):
         self.events_log.append({
@@ -75,8 +97,14 @@ class DroneDeliverySimulation:
                     )
                     if selected_drone:
                         self.pending_orders.remove(req)
+                        # Immediately lock drone state before spawning SimPy process
+                        # so no concurrent request in the same tick can select this drone.
+                        selected_drone.status = DroneStatus.OUTBOUND_DELIVERY
+                        selected_drone.current_request_id = req.request_id
                         req.assigned_drone_id = selected_drone.drone_id
                         req.status = "IN_TRANSIT"
+                        req.mission_status = "OUTBOUND"
+                        req.dispatch_time_min = round(self.env.now, 2)
                         self.env.process(self._drone_mission_process(selected_drone, req))
             yield self.env.timeout(1.0)  # Check dispatch queue every simulated minute
 
@@ -91,6 +119,8 @@ class DroneDeliverySimulation:
 
         # --- OUTBOUND LEG ---
         drone.status = DroneStatus.OUTBOUND_DELIVERY
+        drone.current_request_id = request.request_id
+        request.mission_status = "OUTBOUND"
         outbound_wh = drone.battery.calculate_trip_energy_wh(
             dist_km, drone.specs.cruising_speed_mps, request.package_weight_kg,
             drone.specs.base_power_w, drone.specs.payload_power_coeff_w_per_kg,
@@ -106,22 +136,33 @@ class DroneDeliverySimulation:
         drone.total_flight_time_min += leg_time_min
 
         if not survived:
-            # Catastrophic failure: battery drained to 0 in flight!
+            # Catastrophic failure: battery drained to 0 in outbound flight!
+            failure_time = round(self.env.now, 2)
             drone.status = DroneStatus.FAILED_OUT_OF_BATTERY
+            drone.failure_time_min = failure_time
+            drone.failed_missions += 1
             request.status = "FAILED"
-            self.failed_orders.append(request)
+            request.mission_status = "OUTBOUND_FAILED"
+            request.failure_time_min = failure_time
+            if request not in self.failed_orders and request not in self.completed_orders:
+                self.failed_orders.append(request)
+            if request not in self.failed_missions:
+                self.failed_missions.append(request)
             self.log_event("MISSION_FAILED", drone.drone_id, f"Battery depleted mid-flight to {dest_id}!", 0.0)
             return
 
         # Delivery successful at destination
+        drone.current_node = dest_id
         request.status = "DELIVERED"
         request.delivery_time_min = round(self.env.now, 2)
-        self.completed_orders.append(request)
+        if request not in self.completed_orders and request not in self.failed_orders:
+            self.completed_orders.append(request)
         drone.total_deliveries += 1
         self.log_event("PACKAGE_DELIVERED", drone.drone_id, f"Package {request.request_id} delivered at {dest_id}", drone.battery.current_soc)
 
         # --- INBOUND LEG (EMPTY RETURN) ---
         drone.status = DroneStatus.RETURNING
+        request.mission_status = "RETURNING"
         return_wh = drone.battery.calculate_trip_energy_wh(
             dist_km, drone.specs.cruising_speed_mps, 0.0,
             drone.specs.base_power_w, drone.specs.payload_power_coeff_w_per_kg,
@@ -135,10 +176,27 @@ class DroneDeliverySimulation:
         drone.total_flight_time_min += leg_time_min
 
         if not survived:
+            # Drone depleted battery on return leg: customer delivery succeeded,
+            # but full drone mission failed on the return journey.
+            failure_time = round(self.env.now, 2)
             drone.status = DroneStatus.FAILED_OUT_OF_BATTERY
+            drone.failure_time_min = failure_time
+            drone.failed_missions += 1
+            request.mission_status = "RETURN_FAILED"
+            request.failure_time_min = failure_time
+            if request not in self.return_failures:
+                self.return_failures.append(request)
+            if request not in self.failed_missions:
+                self.failed_missions.append(request)
             self.log_event("RETURN_FAILED", drone.drone_id, f"Battery died on return journey to depot!", 0.0)
             return
 
+        drone.current_node = depot_id
+        drone.completed_missions += 1
+        request.mission_status = "COMPLETED"
+        request.return_time_min = round(self.env.now, 2)
+        if request not in self.completed_missions:
+            self.completed_missions.append(request)
         self.log_event("RETURNED_TO_DEPOT", drone.drone_id, f"Safely returned to depot with SoC: {drone.battery.current_soc*100:.1f}%", drone.battery.current_soc)
 
         # --- CHARGING STATION RESOURCE QUEUE ---
@@ -161,9 +219,10 @@ class DroneDeliverySimulation:
                 charge_time_min = charge_time_hr * 60.0
 
                 yield self.env.timeout(charge_time_min)
-                drone.battery.current_soc = 1.0
-                self.log_event("CHARGING_COMPLETED", drone.drone_id, "Recharged to 100% capacity", 1.0)
+                drone.battery.recharge(energy_needed_wh)
+                self.log_event("CHARGING_COMPLETED", drone.drone_id, f"Recharged to 100% capacity", drone.battery.current_soc)
 
+        drone.current_request_id = None
         drone.status = DroneStatus.IDLE
         self.log_event("DRONE_AVAILABLE", drone.drone_id, "Drone back in IDLE status at depot", drone.battery.current_soc)
 
@@ -175,7 +234,13 @@ class DroneDeliverySimulation:
         total_orders = len(self.requests)
         delivered_orders = len(self.completed_orders)
         failed_orders = len(self.failed_orders)
+        completed_missions = len(self.completed_missions)
+        failed_missions = len(self.failed_missions)
+        return_leg_failures = len(self.return_failures)
+        failed_drones = sum(1 for d in self.drones if d.status == DroneStatus.FAILED_OUT_OF_BATTERY)
+
         success_rate = (delivered_orders / total_orders * 100.0) if total_orders > 0 else 0.0
+        mission_success_rate = (completed_missions / total_orders * 100.0) if total_orders > 0 else 0.0
 
         turnaround_times = [
             (r.delivery_time_min - r.arrival_time_min)
@@ -186,6 +251,14 @@ class DroneDeliverySimulation:
         total_energy = sum(d.total_energy_consumed_wh for d in self.drones)
         total_distance = sum(d.total_distance_km for d in self.drones)
         total_charging_wait = sum(d.total_charging_wait_min for d in self.drones)
+        total_flight_time = sum(d.total_flight_time_min for d in self.drones)
+
+        sim_horizon_min = float(self.env.now)
+        fleet_capacity_min = len(self.drones) * sim_horizon_min
+        drone_utilization = (
+            min(100.0, (total_flight_time / fleet_capacity_min) * 100.0)
+            if fleet_capacity_min > 0.0 else 0.0
+        )
 
         return {
             "algorithm": self.dispatcher.name,
@@ -193,10 +266,16 @@ class DroneDeliverySimulation:
             "total_orders": total_orders,
             "delivered_orders": delivered_orders,
             "failed_orders": failed_orders,
+            "completed_missions": completed_missions,
+            "failed_missions": failed_missions,
+            "return_leg_failures": return_leg_failures,
+            "failed_drones": failed_drones,
             "success_rate_pct": round(success_rate, 1),
+            "mission_success_rate_pct": round(mission_success_rate, 1),
             "avg_delivery_time_min": round(avg_turnaround, 2),
             "total_energy_consumed_wh": round(total_energy, 2),
             "total_distance_km": round(total_distance, 2),
             "total_charging_wait_min": round(total_charging_wait, 2),
+            "drone_utilization_pct": round(drone_utilization, 2),
         }
 
