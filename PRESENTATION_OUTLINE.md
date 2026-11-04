@@ -10,10 +10,11 @@
 
 - **Slide Title:** Climate-Aware Intelligent Urban Drone Network: Battery-Aware Multi-Drone Delivery Simulation for Dumki, Patuakhali
 - **Bullet Points:**
-  - **Subtitle:** An Integrated Simulation Framework for Urban Heat Monitoring and Battery-Aware Multi-Drone Delivery Optimization
+  - **Subtitle:** An Integrated Simulation Framework for Battery-Aware Multi-Drone Delivery Optimization
   - **Case Study Hub:** Patuakhali Science and Technology University (`DEPOT-PSTU`) & Dumki Upazila
-  - **Course:** Simulation and Modeling (`[CSE-3XX]`) — Department of CSE, PSTU
-  - **Presented By:** `[Student Name | ID]` | **Supervised By:** `[Supervisor Name & Designation]`
+  - **Course:** Simulation and Modeling (`[Enter Course Code]`, `[Enter Semester]`) — Academic Session: 2022–2023, PSTU
+  - **Presented By:** A.K.M. Tauhiduzzamana Nibir (Student ID: 2202033 | Reg. No.: 11224)
+  - **Supervision:** Supervisor: Dr. Md. Samsuzzaman Sobuz, Professor, CCE | Co-supervisor: Sarna Majumder, Associate Professor, CCE
 - **Recommended Visual:** Title banner featuring a screenshot of the Streamlit dashboard header and the PSTU/Dumki satellite map view.
 - **Speaker Note:** "Assalamu Alaikum and good morning. Today I am presenting our Simulation and Modeling course project—a discrete-event simulation framework that models battery-aware multi-drone emergency and campus delivery from PSTU Main Campus across Dumki Upazila under coastal weather constraints."
 

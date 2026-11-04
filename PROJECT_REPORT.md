@@ -1,24 +1,27 @@
 # CLIMATE-AWARE INTELLIGENT URBAN DRONE NETWORK
 
-**Subtitle:** *An Integrated Simulation Framework for Urban Heat Monitoring and Battery-Aware Multi-Drone Delivery Optimization: A Case Study of Dumki, Patuakhali, Bangladesh*
+**Subtitle:** *An Integrated Simulation Framework for Battery-Aware Multi-Drone Delivery Optimization: A Case Study of Dumki, Patuakhali, Bangladesh*
 
 ---
 
 ## Title Page Information
 
-| Field | Details *(Editable Placeholders)* |
+| Field | Details |
 | :--- | :--- |
 | **Project Title** | Climate-Aware Intelligent Urban Drone Network |
-| **Subtitle** | An Integrated Simulation Framework for Urban Heat Monitoring and Battery-Aware Multi-Drone Delivery Optimization: A Case Study of Dumki, Patuakhali, Bangladesh |
+| **Subtitle** | An Integrated Simulation Framework for Battery-Aware Multi-Drone Delivery Optimization: A Case Study of Dumki, Patuakhali, Bangladesh |
 | **Course Title** | Simulation and Modeling |
-| **Course Code** | `[CSE-3XX / Enter Course Code]` |
-| **Student Name** | `[Enter Student Name]` |
-| **Student ID / Reg. No.** | `[Enter Student ID / Registration Number]` |
-| **Academic Session / Semester** | `[Level-3, Semester-X / Academic Year]` |
+| **Course Code** | `[Enter Course Code]` |
+| **Student Name** | A.K.M. Tauhiduzzamana Nibir |
+| **Student ID** | 2202033 |
+| **Registration Number** | 11224 |
+| **Academic Session** | 2022–2023 |
+| **Level / Semester** | `[Enter Level / Semester]` |
 | **Department** | Department of Computer Science and Engineering (CSE) |
-| **Supervisor Name & Designation** | `[Enter Supervisor Name, Designation]` |
+| **Supervisor** | Dr. Md. Samsuzzaman Sobuz, Professor, CCE |
+| **Co-supervisor** | Sarna Majumder, Associate Professor, CCE |
 | **Institution** | Patuakhali Science and Technology University (PSTU), Dumki, Patuakhali-8602, Bangladesh |
-| **Submission Date** | `[November 2026 / Enter Submission Date]` |
+| **Submission Date** | `[Enter Submission Date]` |
 
 ---
 
